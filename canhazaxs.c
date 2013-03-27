@@ -27,17 +27,17 @@ typedef struct __stru_entries {
 } entries_t;
 
 
-entries_t suid = { 0, 0, NULL };
-entries_t sgid = { 0, 0, NULL };
-entries_t writable = { 0, 0, NULL };
+entries_t g_suid = { 0, 0, NULL };
+entries_t g_sgid = { 0, 0, NULL };
+entries_t g_writable = { 0, 0, NULL };
 #ifdef RECORD_LESS_INTERESTING
-entries_t readable = { 0, 0, NULL };
-entries_t executable = { 0, 0, NULL };
+entries_t g_readable = { 0, 0, NULL };
+entries_t g_executable = { 0, 0, NULL };
 #endif
 
-uid_t uid;
-gid_t groups[NGROUPS_MAX];
-int ngroups = NGROUPS_MAX;
+uid_t g_uid;
+gid_t g_groups[NGROUPS_MAX];
+int g_ngroups = NGROUPS_MAX;
 
 
 void perror_str(const char *fmt, ...);
@@ -50,7 +50,9 @@ int is_setguid(struct stat *sb);
 int is_writable(struct stat *sb);
 int is_readable(struct stat *sb);
 
-void obtain_user_info(const char *user);
+void add_group(gid_t gid);
+
+void obtain_user_info(const char *user, const char *groups);
 void report_findings(const char *name, entries_t *pentries);
 void record_access(entries_t *pentries, const char *path, struct stat *sb);
 void record_access_level(const char *path, struct stat *sb);
@@ -62,13 +64,17 @@ main(int c, char *v[])
 {
     char canonical_path[PATH_MAX+1] = { 0 };
     int i, opt;
-    char *user = NULL;
+    char *user = NULL, *groups = NULL;
 
     /* process arguments */
-    while ((opt = getopt(c, v, "u:")) != -1) {
+    while ((opt = getopt(c, v, "u:g:")) != -1) {
         switch (opt) {
             case 'u':
                 user = optarg;
+                break;
+
+            case 'g':
+                groups = optarg;
                 break;
 
             default:
@@ -81,7 +87,7 @@ main(int c, char *v[])
     v += optind;
 
     /* get user info */
-    obtain_user_info(user);
+    obtain_user_info(user, groups);
 
     /* process remaining args as directories */
     for (i = 0; i < c; i++) {
@@ -94,12 +100,12 @@ main(int c, char *v[])
     }
 
     /* report the findings */
-    report_findings("set-uid executable", &suid);
-    report_findings("set-gid executable", &sgid);
-    report_findings("writable", &writable);
+    report_findings("set-uid executable", &g_suid);
+    report_findings("set-gid executable", &g_sgid);
+    report_findings("writable", &g_writable);
 #ifdef RECORD_LESS_INTERESTING
-    report_findings("readable", &readable);
-    report_findings("only executable", &executable);
+    report_findings("readable", &g_readable);
+    report_findings("only executable", &g_executable);
 #endif
 
     return 0;
@@ -123,7 +129,19 @@ perror_str(const char *fmt, ...)
 
 
 void
-obtain_user_info(const char *user)
+add_group(gid_t gid)
+{
+    if (g_ngroups + 1 >= NGROUPS_MAX) {
+        fprintf(stderr, "[!] Too many groups!!\n");
+        exit(1);
+    }
+    g_groups[g_ngroups] = gid;
+    g_ngroups++;
+}
+
+
+void
+obtain_user_info(const char *user, const char *groups)
 {
     struct passwd *pw;
     int i;
@@ -137,41 +155,53 @@ obtain_user_info(const char *user)
         exit(1);
     }
 
-    uid = pw->pw_uid;
+    g_uid = pw->pw_uid;
 
+    /* find out what groups the current or specified user is in */
     if (!user) {
-        int num = getgroups(0, groups);
-        if (num > ngroups) {
+        int num = getgroups(0, g_groups);
+        if (num > g_ngroups) {
             fprintf(stderr, "[!] Too many groups!\n");
             exit(1);
         }
-        if ((ngroups = getgroups(ngroups, groups)) == -1) {
+        if ((g_ngroups = getgroups(g_ngroups, g_groups)) == -1) {
             perror("[!] Unable to getgroups");
             exit(1);
         }
 
         /* make sure our gid is in the groups */
-        if (!in_group(pw->pw_gid)) {
-            if (ngroups == NGROUPS_MAX) {
-                fprintf(stderr, "[!] Too many groups!!\n");
-                exit(1);
-            }
-            groups[ngroups] = pw->pw_gid;
-            ngroups++;
-        }
+        if (!in_group(pw->pw_gid))
+            add_group(pw->pw_gid);
     }
     else {
         /* since we are passing the max, we shouldn't have an issue with failed return */
-        getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups);
+        getgrouplist(pw->pw_name, pw->pw_gid, g_groups, &g_ngroups);
+    }
+
+    /* append any extra groups */
+    if (groups) {
+        char *grnam = strtok(groups, ",");
+
+        while (grnam) {
+            struct group *pg = getgrnam(grnam);
+            if (!pg)
+                pg = getgrgid(atoi(grnam));
+            if (!pg) {
+                fprintf(stderr, "[!] Unknown group: %s\n", grnam);
+            }
+            else if (!in_group(pg->gr_gid))
+                add_group(pg->gr_gid);
+            grnam = strtok(NULL, ",");
+        }
     }
 
     /* print what we found :) */
     printf("[*] uid=(%u)%s, groups=", pw->pw_uid, pw->pw_name);
-    for (i = 0; i < ngroups; i++) {
-        struct group *pg = getgrgid(groups[i]);
+    for (i = 0; i < g_ngroups; i++) {
+        struct group *pg = getgrgid(g_groups[i]);
 
         printf("%u(%s)", pg->gr_gid, pg->gr_name);
-        if (i != ngroups - 1)
+        if (i != g_ngroups - 1)
             printf(",");
     }
     printf("\n");
@@ -191,12 +221,12 @@ report_findings(const char *name, entries_t *pentries)
 
 
 int
-in_group(gid_t fgid)
+in_group(gid_t gid)
 {
     int i;
 
-    for (i = 0; i < ngroups; i++) {
-        if (groups[i] == fgid)
+    for (i = 0; i < g_ngroups; i++) {
+        if (g_groups[i] == gid)
             return 1;
     }
     return 0;
@@ -206,11 +236,11 @@ in_group(gid_t fgid)
 int
 is_executable(struct stat *sb)
 {
-    if (uid == 0)
+    if (g_uid == 0)
         return 1;
     if (sb->st_mode & S_IXOTH)
         return 1;
-    if ((sb->st_mode & S_IXUSR) && sb->st_uid == uid)
+    if ((sb->st_mode & S_IXUSR) && sb->st_uid == g_uid)
         return 1;
     if ((sb->st_mode & S_IXGRP) && in_group(sb->st_gid))
         return 1;
@@ -236,12 +266,12 @@ int
 is_writable(struct stat *sb)
 {
     /* although root can write to anything, it doesn't help us to show that here.
-    if (uid == 0)
+    if (g_uid == 0)
         return 1;
      */
     if (sb->st_mode & S_IWOTH)
         return 1;
-    if ((sb->st_mode & S_IWUSR) && sb->st_uid == uid)
+    if ((sb->st_mode & S_IWUSR) && sb->st_uid == g_uid)
         return 1;
     if ((sb->st_mode & S_IWGRP) && in_group(sb->st_gid))
         return 1;
@@ -253,12 +283,12 @@ int
 is_readable(struct stat *sb)
 {
     /* although root can read from anything, it doesn't help us to show that here.
-    if (uid == 0)
+    if (g_uid == 0)
         return 1;
      */
     if (sb->st_mode & S_IROTH)
         return 1;
-    if ((sb->st_mode & S_IRUSR) && sb->st_uid == uid)
+    if ((sb->st_mode & S_IRUSR) && sb->st_uid == g_uid)
         return 1;
     if ((sb->st_mode & S_IRGRP) && in_group(sb->st_gid))
         return 1;
@@ -298,16 +328,16 @@ void
 record_access_level(const char *path, struct stat *sb)
 {
     if (is_setuid(sb))
-        record_access(&suid, path, sb);
+        record_access(&g_suid, path, sb);
     else if (is_setgid(sb))
-        record_access(&sgid, path, sb);
+        record_access(&g_sgid, path, sb);
     else if (is_writable(sb))
-        record_access(&writable, path, sb);
+        record_access(&g_writable, path, sb);
 #ifdef RECORD_LESS_INTERESTING
     else if (is_readable(sb))
-        record_access(&readable, path, sb);
+        record_access(&g_readable, path, sb);
     else if (is_executable(sb))
-        record_access(&executable, path, sb);
+        record_access(&g_executable, path, sb);
 #endif
 }
 
