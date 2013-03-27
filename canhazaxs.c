@@ -213,9 +213,24 @@ report_findings(const char *name, entries_t *pentries)
 {
     unsigned int i;
 
-    printf("[*] Found %u entries that are %s\n", pentries->idx, name);
+    fprintf(stderr, "[*] Found %u entries that are %s\n", pentries->idx, name);
     for (i = 0; i < pentries->idx; i++) {
-        printf("    %s\n", pentries->head[i].path);
+        entry_t *pentry = pentries->head + i;
+        struct passwd *pw = getpwuid(pentry->statbuf.st_uid);
+        struct group *pg = getgrgid(pentry->statbuf.st_gid);
+        char tmpu[128], tmpg[128];
+        char mode_str[16];
+
+        sprintf(mode_str, "%04o", pentry->statbuf.st_mode & ~S_IFMT);
+        if (!pw)
+            sprintf(tmpu, "%u", pentry->statbuf.st_uid);
+        if (!pg)
+            sprintf(tmpg, "%u", pentry->statbuf.st_gid);
+        printf("    %s %s %s %s\n", 
+               mode_str,
+               pw ? pw->pw_name : tmpu,
+               pg ? pg->gr_name : tmpg,
+               pentry->path);
     }
 }
 
