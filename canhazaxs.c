@@ -5,10 +5,14 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <limits.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 
 
 typedef struct __stru_entry {
@@ -31,16 +35,22 @@ entries_t readable = { 0, 0, NULL };
 entries_t executable = { 0, 0, NULL };
 #endif
 
+uid_t uid;
+gid_t groups[NGROUPS_MAX];
+int ngroups = NGROUPS_MAX;
+
 
 void perror_str(const char *fmt, ...);
 char *my_stpcpy(char *dst, const char *src);
 
+int in_group(gid_t fgid);
 int is_executable(struct stat *sb);
 int is_setuid(struct stat *sb);
 int is_setguid(struct stat *sb);
 int is_writable(struct stat *sb);
 int is_readable(struct stat *sb);
 
+void obtain_user_info(const char *user);
 void report_findings(const char *name, entries_t *pentries);
 void record_access(entries_t *pentries, const char *path, struct stat *sb);
 void record_access_level(const char *path, struct stat *sb);
@@ -51,9 +61,30 @@ int
 main(int c, char *v[])
 {
     char canonical_path[PATH_MAX+1] = { 0 };
-    int i;
+    int i, opt;
+    char *user = NULL;
 
-    for (i = 1; i < c; i++) {
+    /* process arguments */
+    while ((opt = getopt(c, v, "u:")) != -1) {
+        switch (opt) {
+            case 'u':
+                user = optarg;
+                break;
+
+            default:
+                fprintf(stderr, "[!] Invalid option: -%c\n", opt);
+                return 1;
+        }
+    }
+
+    c -= optind;
+    v += optind;
+
+    /* get user info */
+    obtain_user_info(user);
+
+    /* process remaining args as directories */
+    for (i = 0; i < c; i++) {
         if (!realpath(v[i], canonical_path)) {
             perror_str("[!] Unable to resolve path \"%s\"", v[i]);
             return 1;
@@ -92,6 +123,62 @@ perror_str(const char *fmt, ...)
 
 
 void
+obtain_user_info(const char *user)
+{
+    struct passwd *pw;
+    int i;
+
+    if (!user)
+        pw = getpwuid(getuid());
+    else
+        pw = getpwnam(user);
+    if (!pw) {
+        fprintf(stderr, "[!] Unable to find the user!\n");
+        exit(1);
+    }
+
+    uid = pw->pw_uid;
+
+    if (!user) {
+        int num = getgroups(0, groups);
+        if (num > ngroups) {
+            fprintf(stderr, "[!] Too many groups!\n");
+            exit(1);
+        }
+        if ((ngroups = getgroups(ngroups, groups)) == -1) {
+            perror("[!] Unable to getgroups");
+            exit(1);
+        }
+
+        /* make sure our gid is in the groups */
+        if (!in_group(pw->pw_gid)) {
+            if (ngroups == NGROUPS_MAX) {
+                fprintf(stderr, "[!] Too many groups!!\n");
+                exit(1);
+            }
+            groups[ngroups] = pw->pw_gid;
+            ngroups++;
+        }
+    }
+    else {
+        /* since we are passing the max, we shouldn't have an issue with failed return */
+        getgrouplist(pw->pw_name, pw->pw_gid, groups, &ngroups);
+    }
+
+    /* print what we found :) */
+    printf("[*] uid=(%u)%s, groups=", pw->pw_uid, pw->pw_name);
+    for (i = 0; i < ngroups; i++) {
+        struct group *pg = getgrgid(groups[i]);
+
+        printf("%u(%s)", pg->gr_gid, pg->gr_name);
+        if (i != ngroups - 1)
+            printf(",");
+    }
+    printf("\n");
+}
+
+
+void
 report_findings(const char *name, entries_t *pentries)
 {
     unsigned int i;
@@ -104,9 +191,30 @@ report_findings(const char *name, entries_t *pentries)
 
 
 int
+in_group(gid_t fgid)
+{
+    int i;
+
+    for (i = 0; i < ngroups; i++) {
+        if (groups[i] == fgid)
+            return 1;
+    }
+    return 0;
+}
+
+
+int
 is_executable(struct stat *sb)
 {
-    return (sb->st_mode & S_IXOTH);
+    if (uid == 0)
+        return 1;
+    if (sb->st_mode & S_IXOTH)
+        return 1;
+    if ((sb->st_mode & S_IXUSR) && sb->st_uid == uid)
+        return 1;
+    if ((sb->st_mode & S_IXGRP) && in_group(sb->st_gid))
+        return 1;
+    return 0;
 }
 
 
@@ -127,14 +235,34 @@ is_setgid(struct stat *sb)
 int
 is_writable(struct stat *sb)
 {
-    return (sb->st_mode & S_IWOTH);
+    /* although root can write to anything, it doesn't help us to show that here.
+    if (uid == 0)
+        return 1;
+     */
+    if (sb->st_mode & S_IWOTH)
+        return 1;
+    if ((sb->st_mode & S_IWUSR) && sb->st_uid == uid)
+        return 1;
+    if ((sb->st_mode & S_IWGRP) && in_group(sb->st_gid))
+        return 1;
+    return 0;
 }
 
 
 int
 is_readable(struct stat *sb)
 {
-    return (sb->st_mode & S_IROTH);
+    /* although root can read from anything, it doesn't help us to show that here.
+    if (uid == 0)
+        return 1;
+     */
+    if (sb->st_mode & S_IROTH)
+        return 1;
+    if ((sb->st_mode & S_IRUSR) && sb->st_uid == uid)
+        return 1;
+    if ((sb->st_mode & S_IRGRP) && in_group(sb->st_gid))
+        return 1;
+    return 0;
 }
 
 
