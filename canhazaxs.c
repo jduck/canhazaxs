@@ -32,6 +32,49 @@ entries_t executable = { 0, 0, NULL };
 #endif
 
 
+void perror_str(const char *fmt, ...);
+char *my_stpcpy(char *dst, const char *src);
+
+int is_executable(struct stat *sb);
+int is_setuid(struct stat *sb);
+int is_setguid(struct stat *sb);
+int is_writable(struct stat *sb);
+int is_readable(struct stat *sb);
+
+void report_findings(const char *name, entries_t *pentries);
+void record_access(entries_t *pentries, const char *path, struct stat *sb);
+void record_access_level(const char *path, struct stat *sb);
+void scan_directory(const char *dir);
+
+
+int
+main(int c, char *v[])
+{
+    char canonical_path[PATH_MAX+1] = { 0 };
+    int i;
+
+    for (i = 1; i < c; i++) {
+        if (!realpath(v[i], canonical_path)) {
+            perror_str("[!] Unable to resolve path \"%s\"", v[i]);
+            return 1;
+        }
+
+        scan_directory(canonical_path);
+    }
+
+    /* report the findings */
+    report_findings("set-uid executable", &suid);
+    report_findings("set-gid executable", &sgid);
+    report_findings("writable", &writable);
+#ifdef RECORD_LESS_INTERESTING
+    report_findings("readable", &readable);
+    report_findings("only executable", &executable);
+#endif
+
+    return 0;
+}
+
+
 void
 perror_str(const char *fmt, ...)
 {
@@ -119,7 +162,6 @@ record_access(entries_t *pentries, const char *path, struct stat *sb)
     pentry->path = strdup(path);
     memcpy(&(pentry->statbuf), sb, sizeof(pentry->statbuf));
 }
-
 
 /*
  * filter the permissions we have on the entry into buckets
@@ -211,30 +253,3 @@ scan_directory(const char *dir)
     closedir(pd);
 }
 
-
-int
-main(int c, char *v[])
-{
-    char canonical_path[PATH_MAX+1] = { 0 };
-    int i;
-
-    for (i = 1; i < c; i++) {
-        if (!realpath(v[i], canonical_path)) {
-            perror_str("[!] Unable to resolve path \"%s\"", v[i]);
-            return 1;
-        }
-
-        scan_directory(canonical_path);
-    }
-
-    /* report the findings */
-    report_findings("set-uid executable", &suid);
-    report_findings("set-gid executable", &sgid);
-    report_findings("writable", &writable);
-#ifdef RECORD_LESS_INTERESTING
-    report_findings("readable", &readable);
-    report_findings("only executable", &executable);
-#endif
-
-    return 0;
-}
