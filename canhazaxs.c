@@ -23,11 +23,13 @@ typedef struct __stru_entries {
 } entries_t;
 
 
-entries_t writable = { 0, 0, NULL };
-entries_t readable = { 0, 0, NULL };
 entries_t suid = { 0, 0, NULL };
 entries_t sgid = { 0, 0, NULL };
+entries_t writable = { 0, 0, NULL };
+#ifdef RECORD_LESS_INTERESTING
+entries_t readable = { 0, 0, NULL };
 entries_t executable = { 0, 0, NULL };
+#endif
 
 
 void
@@ -140,9 +142,10 @@ record_access_level(const char *path, struct stat *sb)
 }
 
 
-char *my_stpcpy(char *dst, char *src)
+char *my_stpcpy(char *dst, const char *src)
 {
-    char *q = dst, *p = src;
+    char *q = dst;
+    const char *p = src;
 
     while (*p)
         *q++ = *p++;
