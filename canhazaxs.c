@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <limits.h>
 #include <dirent.h>
 #include <sys/stat.h>
 
@@ -139,6 +140,16 @@ record_access_level(const char *path, struct stat *sb)
 }
 
 
+char *my_stpcpy(char *dst, char *src)
+{
+    char *q = dst, *p = src;
+
+    while (*p)
+        *q++ = *p++;
+    return q;
+}
+
+
 void
 scan_directory(const char *dir)
 {
@@ -161,7 +172,7 @@ scan_directory(const char *dir)
                 continue;
         }
 
-        end = stpcpy(canonical_path, dir);
+        end = my_stpcpy(canonical_path, dir);
         if (end - canonical_path >= PATH_MAX - 1 - strlen(pe->d_name)) {
             fprintf(stderr, "[!] name too long \"%s/%s\"\n", dir, pe->d_name);
             continue;
