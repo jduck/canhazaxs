@@ -1,0 +1,2 @@
+1. dont traverse (as root) into directories that the target uid/gid cant enter
+2. show an indicator for type of dir entry (b,c,d,regular)
