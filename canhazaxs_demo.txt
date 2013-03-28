@@ -1,0 +1,64 @@
+(sgs3)dq:0:~/android/dev/cluster$ adb push ~/canhazaxs/charm /data/local/tmp ; adb shell /data/local/tmp/charm -u shell -g shell,graphics,input,log,mount,adb,sdcard_rw,sdcard_r,net_bt_admin,net_bt,inet,net_bw_stats /data/local /data/misc /data/log /dev
+1758 KB/s (43924 bytes in 0.024s)
+[*] uid=(2000)shell, groups=2000(shell),1003(graphics),1004(input),1007(log),1009(mount),1011(adb),1015(sdcard_rw),1028(sdcard_r),3001(net_bt_admin),3002(net_bt),3003(inet),3006(net_bw_stats)
+[!] Unable to open dir "/data/local": Permission denied
+[!] Unable to open dir "/data/misc": Permission denied
+[!] Unable to open dir "/dev/block/vold": Permission denied
+[!] Unable to open dir "/dev/socket/qmux_gps": Permission denied
+[!] Unable to open dir "/dev/socket/qmux_audio": Permission denied
+[!] Unable to open dir "/dev/socket/qmux_radio": Permission denied
+[*] Found 0 entries that are set-uid executable
+[*] Found 0 entries that are set-gid executable
+[*] Found 52 entries that are writable
+    0222 root root /dev/cpuctl/apps/bg_non_interactive/cgroup.event_control
+    0666 system system /dev/cpuctl/apps/bg_non_interactive/tasks
+    0222 root root /dev/cpuctl/apps/cgroup.event_control
+    0666 system system /dev/cpuctl/apps/tasks
+    0222 root root /dev/cpuctl/cgroup.event_control
+    0771 shell shell /dev/pipes
+    0666 shell shell /dev/pipes/tsprsp
+    0666 shell shell /dev/pipes/tspreq
+    0660 system graphics /dev/graphics/fb2
+    0660 system graphics /dev/graphics/fb1
+    0660 system graphics /dev/graphics/fb0
+    0666 root root /dev/ptmx
+    0666 root root /dev/tty
+    0666 root root /dev/urandom
+    0666 root root /dev/random
+    0666 root root /dev/full
+    0666 root root /dev/zero
+    0666 root root /dev/null
+    0660 root shell /dev/tspdrv
+    0666 root log /dev/log/system
+    0666 root log /dev/log/radio
+    0666 root log /dev/log/events
+    0666 root log /dev/log/main
+    0666 root root /dev/binder
+    0660 adb adb /dev/android_adb
+    0666 root root /dev/genlock
+    0666 root root /dev/ashmem
+    0666 root root /dev/kgsl-2d1
+    0666 root root /dev/kgsl-2d0
+    0666 root root /dev/kgsl-3d0
+    0660 root input /dev/input/event6
+    0660 root input /dev/input/event8
+    0660 root input /dev/input/mice
+    0660 root input /dev/input/event4
+    0660 root input /dev/input/event3
+    0660 root input /dev/input/event2
+    0660 root input /dev/input/event0
+    0660 root input /dev/input/event12
+    0660 root input /dev/input/event11
+    0660 root input /dev/input/event10
+    0660 root input /dev/input/event9
+    0660 root input /dev/input/event13
+    0660 root input /dev/input/event1
+    0660 root input /dev/input/event5
+    0660 root input /dev/input/event7
+    0666 root system /dev/socket/mpctl
+    0666 root root /dev/socket/keystore
+    0660 root inet /dev/socket/dnsproxyd
+    0660 root mount /dev/socket/vold
+    0660 root mount /dev/socket/dir_enc_report
+    0666 root root /dev/socket/property_service
+    0600 shell shell /dev/pts/0
