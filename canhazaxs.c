@@ -222,13 +222,44 @@ report_findings(const char *name, entries_t *pentries)
         struct group *pg = getgrgid(pentry->statbuf.st_gid);
         char tmpu[128], tmpg[128];
         char mode_str[16];
+        char *type_str = "unknown";
 
         sprintf(mode_str, "%04o", pentry->statbuf.st_mode & ~S_IFMT);
         if (!pw)
             sprintf(tmpu, "%u", pentry->statbuf.st_uid);
         if (!pg)
             sprintf(tmpg, "%u", pentry->statbuf.st_gid);
-        printf("    %s %s %s %s\n", 
+        switch (pentry->statbuf.st_mode & S_IFMT) {
+            case S_IFSOCK:
+                type_str = "socket";
+                break;
+
+            case S_IFLNK: // we're ignoring these, so this shouldn't happen
+                type_str = "link";
+                break;
+
+            case S_IFREG:
+                type_str = "file";
+                break;
+
+            case S_IFBLK:
+                type_str = "blkdev";
+                break;
+
+            case S_IFDIR:
+                type_str = "directory";
+                break;
+
+            case S_IFCHR:
+                type_str = "chardev";
+                break;
+
+            case S_IFIFO:
+                type_str = "fifo";
+                break;
+        }
+        printf("    %9s %s %s %s %s\n", 
+               type_str,
                mode_str,
                pw ? pw->pw_name : tmpu,
                pg ? pg->gr_name : tmpg,
