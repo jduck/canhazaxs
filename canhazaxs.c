@@ -1,5 +1,7 @@
 /*
  * look through the file system to see what we have access to.
+ *
+ * Joshua J. Drake <jduck>
  */
 #include <stdio.h>
 #include <stdarg.h>
@@ -419,7 +421,8 @@ scan_directory(const char *dir)
         record_access_level(canonical_path, &sb);
 
         /* can the child directory too */
-        if (pe->d_type == DT_DIR)
+        if (pe->d_type == DT_DIR
+            && is_executable(&sb))
             scan_directory(canonical_path);
     }
 
