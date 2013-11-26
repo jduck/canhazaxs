@@ -198,7 +198,7 @@ obtain_user_info(const char *user, const char *groups)
     }
 
     /* print what we found :) */
-    printf("[*] uid=(%u)%s, groups=", pw->pw_uid, pw->pw_name);
+    printf("[*] uid=%u(%s), groups=", pw->pw_uid, pw->pw_name);
     for (i = 0; i < g_ngroups; i++) {
         struct group *pg = getgrgid(g_groups[i]);
 
