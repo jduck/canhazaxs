@@ -452,7 +452,7 @@ scan_directory(const char *dir)
         record_access_level(canonical_path, &sb);
 
         /* can the child directory too */
-        if (pe->d_type == DT_DIR
+        if (S_ISDIR(sb.st_mode)
             && is_executable(&sb))
             scan_directory(canonical_path);
     }
