@@ -152,17 +152,38 @@ obtain_user_info(const char *user, const char *groups)
 {
     struct passwd *pw;
     int i;
+    uid_t uid = -1;
 
-    if (!user)
-        pw = getpwuid(getuid());
-    else
-        pw = getpwnam(user);
-    if (!pw) {
-        fprintf(stderr, "[!] Unable to find the user!\n");
-        exit(1);
+    /* no user specified? use the current uid. */
+    if (!user) {
+        uid = getuid();
+        pw = getpwuid(uid);
     }
+    else {
+        /* try to resolve the pw struct from the user string */
+        pw = getpwnam(user);
 
-    g_uid = pw->pw_uid;
+        /* if it fails, try to treat it as a number */
+        if (!pw) {
+            char *endptr = (char *)user;
+
+            /* try by id as well */
+            uid = strtol(user, &endptr, 0);
+            if (uid == ULONG_MAX || *endptr != '\0') {
+                fprintf(stderr, "[!] Invalid user id: %s!\n", user);
+                exit(1);
+            }
+
+            pw = getpwuid(uid);
+        }
+    }
+    if (!pw) {
+        fprintf(stderr, "[!] Unable to find uid %lu, trying anyway...\n", (unsigned long)uid);
+        g_uid = uid;
+        g_ngroups = 0;
+    }
+    else
+        g_uid = pw->pw_uid;
 
     /* find out what groups the current or specified user is in */
     if (!user) {
@@ -180,35 +201,61 @@ obtain_user_info(const char *user, const char *groups)
         if (!in_group(pw->pw_gid))
             add_group(pw->pw_gid);
     }
-    else {
+    else if (pw) {
         /* since we are passing the max, we shouldn't have an issue with failed return */
         getgrouplist(pw->pw_name, pw->pw_gid, g_groups, &g_ngroups);
     }
+    /* else we have no way of knowing, the user doesn't exist =) */
 
     /* append any extra groups */
     if (groups) {
-        char *grnam = strtok(groups, ",");
-        char *endptr;
+        char *grnam = strtok((char *)groups, ",");
 
         while (grnam) {
             struct group *pg = getgrnam(grnam);
-            if (!pg)
-                pg = getgrgid((int)strtol(grnam, &endptr, 10));
-            if (!pg || grnam == endptr) {
-                fprintf(stderr, "[!] Unknown group: %s\n", grnam);
+            gid_t gid;
+
+            if (!pg) {
+                char *endptr = grnam;
+
+                gid = strtoul(grnam, &endptr, 0);
+                /* a bad number indicates a probably mistake */
+                if (gid == ULONG_MAX || *endptr != '\0') {
+                    fprintf(stderr, "[!] Unknown/invalid group: %s\n", grnam);
+                    exit(1);
+                }
+
+                /* try again */
+                pg = getgrgid(gid);
+            }
+
+            if (!pg) {
+                /* this is just a warning, add the number and keep processing others */
+                fprintf(stderr, "[!] Unable to find gid %s, trying anyway...\n", grnam);
+                if (!in_group(gid))
+                    add_group(gid);
             }
             else if (!in_group(pg->gr_gid))
                 add_group(pg->gr_gid);
+
+            /* process the next group name. */
             grnam = strtok(NULL, ",");
         }
     }
 
     /* print what we found :) */
-    printf("[*] uid=%u(%s), groups=", pw->pw_uid, pw->pw_name);
+    if (pw)
+        printf("[*] uid=%u(%s), groups=", pw->pw_uid, pw->pw_name);
+    else
+        printf("[*] uid=%u(?), groups=", g_uid);
+
     for (i = 0; i < g_ngroups; i++) {
         struct group *pg = getgrgid(g_groups[i]);
 
-        printf("%u(%s)", pg->gr_gid, pg->gr_name);
+        if (pg)
+            printf("%u(%s)", pg->gr_gid, pg->gr_name);
+        else
+            printf("%u(?)", g_groups[i]);
         if (i != g_ngroups - 1)
             printf(",");
     }
