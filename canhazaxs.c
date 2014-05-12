@@ -1,8 +1,10 @@
 /*
  * look through the file system to see what we have access to.
  *
- * Joshua J. Drake <jduck>
+ * Joshua J. Drake <jduck> of droidsec
+ * (c) 2014
  */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -142,6 +144,9 @@ add_group(gid_t gid)
 }
 
 
+/*
+ * NOTE: the "groups" string will be modified in place by strtok()
+ */
 void
 obtain_user_info(const char *user, const char *groups)
 {
@@ -227,15 +232,15 @@ report_findings(const char *name, entries_t *pentries)
 
         sprintf(mode_str, "%04o", pentry->statbuf.st_mode & ~S_IFMT);
         if (!pw)
-            sprintf(tmpu, "%u", pentry->statbuf.st_uid);
+            sprintf(tmpu, "%lu", (unsigned long)pentry->statbuf.st_uid);
         if (!pg)
-            sprintf(tmpg, "%u", pentry->statbuf.st_gid);
+            sprintf(tmpg, "%lu", (unsigned long)pentry->statbuf.st_gid);
         switch (pentry->statbuf.st_mode & S_IFMT) {
             case S_IFSOCK:
                 type_str = "socket";
                 break;
 
-            case S_IFLNK: // we're ignoring these, so this shouldn't happen
+            case S_IFLNK: /* we're ignoring these, so this shouldn't happen */
                 type_str = "link";
                 break;
 
@@ -354,7 +359,7 @@ record_access(entries_t *pentries, const char *path, struct stat *sb)
     if (new_next_idx > pentries->len) {
         entry_t *new_head;
         /* grow array */
-        // XXX: TODO: optimize allocations
+        /* XXX: TODO: optimize allocations */
         new_head = (entry_t *)realloc(pentries->head, (pentries->len + 1) * sizeof(entry_t));
         if (!new_head) {
             fprintf(stderr, "[!] Out of memory!\n");
