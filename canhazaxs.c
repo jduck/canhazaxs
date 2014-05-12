@@ -183,12 +183,13 @@ obtain_user_info(const char *user, const char *groups)
     /* append any extra groups */
     if (groups) {
         char *grnam = strtok(groups, ",");
+        char *endptr;
 
         while (grnam) {
             struct group *pg = getgrnam(grnam);
             if (!pg)
-                pg = getgrgid(atoi(grnam));
-            if (!pg) {
+                pg = getgrgid((int)strtol(grnam, &endptr, 10));
+            if (!pg || grnam == endptr) {
                 fprintf(stderr, "[!] Unknown group: %s\n", grnam);
             }
             else if (!in_group(pg->gr_gid))
