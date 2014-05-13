@@ -64,14 +64,14 @@ void scan_directory(const char *dir);
 
 
 int
-main(int c, char *v[])
+main(int argc, char *argv[])
 {
     char canonical_path[PATH_MAX+1] = { 0 };
     int i, opt;
     char *user = NULL, *groups = NULL;
 
     /* process arguments */
-    while ((opt = getopt(c, v, "u:g:")) != -1) {
+    while ((opt = getopt(argc, argv, "u:g:")) != -1) {
         switch (opt) {
             case 'u':
                 user = optarg;
@@ -87,16 +87,16 @@ main(int c, char *v[])
         }
     }
 
-    c -= optind;
-    v += optind;
+    argc -= optind;
+    argv += optind;
 
     /* get user info */
     obtain_user_info(user, groups);
 
     /* process remaining args as directories */
-    for (i = 0; i < c; i++) {
-        if (!realpath(v[i], canonical_path)) {
-            perror_str("[!] Unable to resolve path \"%s\"", v[i]);
+    for (i = 0; i < argc; i++) {
+        if (!realpath(argv[i], canonical_path)) {
+            perror_str("[!] Unable to resolve path \"%s\"", argv[i]);
             return 1;
         }
 
