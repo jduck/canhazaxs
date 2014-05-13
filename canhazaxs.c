@@ -61,6 +61,7 @@ void report_findings(const char *name, entries_t *pentries);
 void record_access(entries_t *pentries, const char *path, struct stat *sb);
 void record_access_level(const char *path, struct stat *sb);
 void scan_directory(const char *dir);
+void usage(char *argv[]);
 
 
 int
@@ -82,7 +83,7 @@ main(int argc, char *argv[])
                 break;
 
             default:
-                fprintf(stderr, "[!] Invalid option: -%c\n", opt);
+                usage(argv);
                 return 1;
         }
     }
@@ -513,3 +514,22 @@ scan_directory(const char *dir)
     closedir(pd);
 }
 
+
+void
+usage(char *argv[])
+{
+    char *cmd = "canhazaxs";
+
+    if (argv && argv[0])
+        cmd = argv[0];
+    fprintf(stderr,
+        "usage: %s [opts] <path 1> <path 2> .. <path N>\n"
+        "\n"
+        "supported options:\n"
+        "-u <uid> \tpretend to be the specified user id or name when testing access\n"
+        "         \tNOTE: the initiail group list comes from this user. if not\n"
+        "         \tspecified, groups are inherited from the current user.\n"
+        "-g <gid> \tadd the specified group name or id to the supplementary group list\n"
+        "         \tNOTE: separate multiple groups with a comma.\n"
+        , cmd);
+}
