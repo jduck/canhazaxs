@@ -167,13 +167,15 @@ obtain_user_info(const char *user, const char *groups)
         /* if it fails, try to treat it as a number */
         if (!pw) {
             char *endptr = (char *)user;
+            long uid_tmp;
 
             /* try by id as well */
-            uid = strtol(user, &endptr, 0);
-            if (uid == ULONG_MAX || *endptr != '\0') {
+            uid_tmp = strtol(user, &endptr, 0);
+            if (uid_tmp == LONG_MAX || *endptr != '\0') {
                 fprintf(stderr, "[!] Invalid user id: %s!\n", user);
                 exit(1);
             }
+            uid = uid_tmp;
 
             pw = getpwuid(uid);
         }
@@ -214,17 +216,19 @@ obtain_user_info(const char *user, const char *groups)
 
         while (grnam) {
             struct group *pg = getgrnam(grnam);
+            unsigned long gid_tmp;
             gid_t gid;
 
             if (!pg) {
                 char *endptr = grnam;
 
-                gid = strtoul(grnam, &endptr, 0);
+                gid_tmp = strtoul(grnam, &endptr, 0);
                 /* a bad number indicates a probably mistake */
-                if (gid == ULONG_MAX || *endptr != '\0') {
+                if (gid_tmp == ULONG_MAX || *endptr != '\0') {
                     fprintf(stderr, "[!] Unknown/invalid group: %s\n", grnam);
                     exit(1);
                 }
+                gid = gid_tmp;
 
                 /* try again */
                 pg = getgrgid(gid);
